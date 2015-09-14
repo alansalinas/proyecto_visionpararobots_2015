@@ -17,6 +17,7 @@
 #define KEYBOARD_DELAY 5
 #define SLEEP_DELAY	15000
 
+//	HSV Filter Limit Range
 #define HSV_FILTER_H_MIN	0
 #define HSV_FILTER_S_MIN	0
 #define HSV_FILTER_V_MIN	105
@@ -25,6 +26,7 @@
 #define HSV_FILTER_S_MAX	255
 #define HSV_FILTER_V_MAX	235
 
+// RGB Filter Limit Range
 #define RGB_FILTER_R_MIN	215
 #define RGB_FILTER_G_MIN	85
 #define RGB_FILTER_B_MIN	32
@@ -33,6 +35,7 @@
 #define RGB_FILTER_G_MAX	125
 #define RGB_FILTER_B_MAX	96
 
+// YCrCb Filter Limit Range
 #define YCrCb_FILTER_Y_MIN	100
 #define YCrCb_FILTER_Cr_MIN	200
 #define YCrCb_FILTER_Cb_MIN	90
@@ -44,7 +47,12 @@
 using namespace std;
 using namespace cv;
 
+/*
+	Global variable declarations
+*/
+
 bool stop = false;
+bool freezeImage = false;
 CRawImage *droneImage, *cleanimage;
 CHeli *heli;
 float pitch, roll, yaw, height;
@@ -384,6 +392,7 @@ void pollKeyboard()	// Polls the keyboard for events, waits for KEYBOARD_DELAY m
 		case 'i': pitch = -20000.0; break;
 		case 'k': pitch = 20000.0; break;
 		case 'h': hover = (hover + 1) % 2; break;
+		case '.': freezeImage = !freezeImage; break;
 		case 27: stop = true; break;
 		default: pitch = roll = yaw = height = 0.0;
 		}
@@ -437,9 +446,12 @@ int main(int argc,char* argv[])
 
     	displayConsoleData();	// print telemetric drone and image info through console
 
+			if (!freezeImage)
+			{
 			heli->renewImage(droneImage); // image is captured
 			rawToMat(currentImage, droneImage); // Copy to OpenCV Mat
 			//rawToMat(imagenClick, droneImage);
+			}
 
 			//currentImage =  imread("/home/alan/Pictures/naranja.jpeg", 1);
 			//imagenClick =  imread("/home/alan/Pictures/tv.jpg", 1);
