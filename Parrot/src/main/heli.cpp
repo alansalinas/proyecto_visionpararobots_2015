@@ -16,21 +16,29 @@
 
 #define KEYBOARD_DELAY 5
 
-#define HSV_FILTER_H_MIN	60
-#define HSV_FILTER_S_MIN	1
-#define HSV_FILTER_V_MIN	10
+#define HSV_FILTER_H_MIN	0
+#define HSV_FILTER_S_MIN	0
+#define HSV_FILTER_V_MIN	0
 
-#define HSV_FILTER_H_MAX	100
-#define HSV_FILTER_S_MAX	19
-#define HSV_FILTER_V_MAX	70
+#define HSV_FILTER_H_MAX	0
+#define HSV_FILTER_S_MAX	0
+#define HSV_FILTER_V_MAX	0
 
-#define RGB_FILTER_R_MIN	100
-#define RGB_FILTER_G_MIN	200
-#define RGB_FILTER_B_MIN	90
+#define RGB_FILTER_R_MIN	0
+#define RGB_FILTER_G_MIN	0
+#define RGB_FILTER_B_MIN	0
 
-#define RGB_FILTER_R_MAX	170
-#define RGB_FILTER_G_MAX	220
-#define RGB_FILTER_B_MAX	160
+#define RGB_FILTER_R_MAX	255
+#define RGB_FILTER_G_MAX	0
+#define RGB_FILTER_B_MAX	0
+
+#define YCrCb_FILTER_Y_MIN	100
+#define YCrCb_FILTER_Cr_MIN	200
+#define YCrCb_FILTER_Cb_MIN	90
+
+#define YCrCb_FILTER_Y_MAX	170
+#define YCrCb_FILTER_Cr_MAX	220
+#define YCrCb_FILTER_Cb_MAX	160
 
 using namespace std;
 using namespace cv;
@@ -49,12 +57,14 @@ string ultimo = "init";
 
 int Px;
 int Py;
-int vR, vG, vB;
-int vV, vS, vH;
+int vR, vG, vB;	// variables para modelo RGB
+int vV, vS, vH;	// variables para modelo HSV
+int vY, vCr, vCb;	// variables para modelo Y Cr Cb
 
 // Global Mat images
-Mat imagenClick, imagenHSV, imagenGrayscale;
+Mat imagenClick, imagenHSV, imagenGrayscale, imagenYCrCb;
 Mat imagenThreshold, maskFiltroRGB, maskFiltroHSV, imagenFiltroRGB, imagenFiltroHSV;
+Mat maskFiltroYCrCb, imagenFiltroYCrCb;
 
 // Here we will store points
 vector<Point> points;
@@ -211,6 +221,11 @@ void mouseCoordinatesExampleCallback(int event, int x, int y, int flags, void* p
             vS=destination[Px*3+1];
             vV=destination[Px*3+2];
 
+						destination = (uchar*) imagenYCrCb.ptr<uchar>(Py);
+						vY=destination[Px * 3];
+            vCr=destination[Px*3+1];
+            vCb=destination[Px*3+2];
+
 		        /*  Draw a point */
 		        //points.push_back(Point(Px, Py));
 
@@ -305,6 +320,7 @@ void displayConsoleData()
 	fprintf(stdout, "Navigating with Joystick: %d \n", navigatedWithJoystick ? 1 : 0);
 	cout<<"Pos X: "<<Px<<" Pos Y: "<<Py<<" Valor RGB: ("<<vR<<","<<vG<<","<<vB<<")"<<endl;
 	cout<<"Pos X: "<<Px<<" Pos Y: "<<Py<<" Valor HSV: ("<<vH<<","<<vS<<","<<vV<<")"<<endl;
+	cout<<"Pos X: "<<Px<<" Pos Y: "<<Py<<" Valor Y Cr Cb: ("<<vY<<","<<vCr<<","<<vCb<<")"<<endl;
 }
 
 // Polls the joystick controller for changes and commands them to drone
@@ -433,6 +449,7 @@ int main(int argc,char* argv[])
 			// Conversiones de espacios de color
 			cvtColor(currentImage, imagenGrayscale, CV_BGR2GRAY);
 			cvtColor(currentImage, imagenHSV, CV_BGR2HSV);
+			cvtColor(currentImage, imagenYCrCb, CV_BGR2YCrCb);
 			threshold(imagenGrayscale, imagenThreshold, 150, 255, THRESH_BINARY);
 
 			// filtro de color RGB Scalar(B,G,R)
@@ -442,6 +459,11 @@ int main(int argc,char* argv[])
 			// filtro de color HSV Scalar(V,S,H)
 			inRange(imagenClick, Scalar(HSV_FILTER_V_MIN, HSV_FILTER_S_MIN, HSV_FILTER_H_MIN), Scalar(HSV_FILTER_V_MAX, HSV_FILTER_S_MAX, HSV_FILTER_H_MAX), maskFiltroHSV);
 			bitwise_and(imagenClick, imagenClick, imagenFiltroRGB, maskFiltroRGB);
+
+
+			// filtro de color HSV Scalar(V,S,H)
+			inRange(imagenClick, Scalar(YCrCb_FILTER_Y_MIN, YCrCb_FILTER_Cr_MIN, YCrCb_FILTER_Cb_MIN), Scalar(YCrCb_FILTER_Y_MAX, YCrCb_FILTER_Cr_MAX, YCrCb_FILTER_Cb_MAX), maskFiltroHSV);
+			bitwise_and(imagenClick, imagenClick, imagenFiltroYCrCb, maskFiltroYCrCb);
 
 			// Show images
 			//imshow("Original", currentImage);
