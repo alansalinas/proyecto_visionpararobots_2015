@@ -19,19 +19,19 @@
 
 #define HSV_FILTER_H_MIN	0
 #define HSV_FILTER_S_MIN	0
-#define HSV_FILTER_V_MIN	0
+#define HSV_FILTER_V_MIN	105
 
-#define HSV_FILTER_H_MAX	0
-#define HSV_FILTER_S_MAX	0
-#define HSV_FILTER_V_MAX	0
+#define HSV_FILTER_H_MAX	50
+#define HSV_FILTER_S_MAX	255
+#define HSV_FILTER_V_MAX	235
 
-#define RGB_FILTER_R_MIN	0
-#define RGB_FILTER_G_MIN	0
-#define RGB_FILTER_B_MIN	0
+#define RGB_FILTER_R_MIN	215
+#define RGB_FILTER_G_MIN	85
+#define RGB_FILTER_B_MIN	32
 
-#define RGB_FILTER_R_MAX	255
-#define RGB_FILTER_G_MAX	0
-#define RGB_FILTER_B_MAX	0
+#define RGB_FILTER_R_MAX	241
+#define RGB_FILTER_G_MAX	125
+#define RGB_FILTER_B_MAX	96
 
 #define YCrCb_FILTER_Y_MIN	100
 #define YCrCb_FILTER_Cr_MIN	200
@@ -441,11 +441,14 @@ int main(int argc,char* argv[])
 			rawToMat(currentImage, droneImage); // Copy to OpenCV Mat
 			//rawToMat(imagenClick, droneImage);
 
-			currentImage =  imread("/home/alan/Pictures/tv.jpg", 1);
-			imagenClick =  imread("/home/alan/Pictures/tv.jpg", 1);
+			//currentImage =  imread("/home/alan/Pictures/naranja.jpeg", 1);
+			//imagenClick =  imread("/home/alan/Pictures/tv.jpg", 1);
 
-
+			imagenClick = currentImage;
 			getRGBHistogram(currentImage);
+
+			imagenFiltroRGB = Mat::zeros(240, 320, CV_8UC3);
+			imagenFiltroHSV = Mat::zeros(240, 320, CV_8UC3);
 
 			// Conversiones de espacios de color
 			cvtColor(currentImage, imagenGrayscale, CV_BGR2GRAY);
@@ -457,12 +460,12 @@ int main(int argc,char* argv[])
 			inRange(imagenClick, Scalar(RGB_FILTER_B_MIN, RGB_FILTER_G_MIN, RGB_FILTER_R_MIN), Scalar(RGB_FILTER_B_MAX, RGB_FILTER_G_MAX, RGB_FILTER_R_MAX), maskFiltroRGB);
 			bitwise_and(imagenClick, imagenClick, imagenFiltroRGB, maskFiltroRGB);
 
-			// filtro de color HSV Scalar(V,S,H)
-			inRange(imagenClick, Scalar(HSV_FILTER_V_MIN, HSV_FILTER_S_MIN, HSV_FILTER_H_MIN), Scalar(HSV_FILTER_V_MAX, HSV_FILTER_S_MAX, HSV_FILTER_H_MAX), maskFiltroHSV);
-			bitwise_and(imagenClick, imagenClick, imagenFiltroRGB, maskFiltroRGB);
+			// filtro de color HSV Scalar(H,S,V)
+			inRange(imagenClick, Scalar(HSV_FILTER_H_MIN, HSV_FILTER_S_MIN, HSV_FILTER_V_MIN), Scalar(HSV_FILTER_H_MAX, HSV_FILTER_S_MAX, HSV_FILTER_V_MAX), maskFiltroHSV);
+			bitwise_and(imagenClick, imagenClick, imagenFiltroHSV, maskFiltroHSV);
 
 
-			// filtro de color HSV Scalar(V,S,H)
+			// filtro de colOR YCrCb
 			inRange(imagenClick, Scalar(YCrCb_FILTER_Y_MIN, YCrCb_FILTER_Cr_MIN, YCrCb_FILTER_Cb_MIN), Scalar(YCrCb_FILTER_Y_MAX, YCrCb_FILTER_Cr_MAX, YCrCb_FILTER_Cb_MAX), maskFiltroHSV);
 			bitwise_and(imagenClick, imagenClick, imagenFiltroYCrCb, maskFiltroYCrCb);
 
@@ -473,6 +476,7 @@ int main(int argc,char* argv[])
 			imshow("Grayscale", imagenGrayscale);
 			imshow("Threshold", imagenThreshold);
 			imshow("Filtro RGB", imagenFiltroRGB);
+			imshow("Filtro HSV", imagenFiltroHSV);
 
 
       usleep(SLEEP_DELAY);
