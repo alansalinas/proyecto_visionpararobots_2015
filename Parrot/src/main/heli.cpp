@@ -15,6 +15,7 @@
 #include <iostream>
 
 #define KEYBOARD_DELAY 5
+#define SLEEP_DELAY	15000
 
 #define HSV_FILTER_H_MIN	0
 #define HSV_FILTER_S_MIN	0
@@ -474,7 +475,7 @@ int main(int argc,char* argv[])
 			imshow("Filtro RGB", imagenFiltroRGB);
 
 
-        usleep(15000);
+      usleep(SLEEP_DELAY);
 	}
 
 	heli->land();
