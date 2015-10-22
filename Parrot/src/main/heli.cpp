@@ -487,9 +487,9 @@ int main(int argc,char* argv[])
     	imshow("Click", imagenClick);
 			imshow("Grayscale", imagenGrayscale);
 			imshow("Threshold", imagenThreshold);
+			imshow("HSE", imagenHSV);
 			imshow("Filtro RGB", imagenFiltroRGB);
 			imshow("Filtro HSV", imagenFiltroHSV);
-
 
       usleep(SLEEP_DELAY);
 	}
