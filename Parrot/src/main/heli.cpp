@@ -309,6 +309,48 @@ void getRGBHistogram(Mat src)
 	imshow("Hist B", histImageB);
 }	// end histogramas
 
+void funcion_prueba() {
+
+cout<<"funcion prueba"<<endl;
+//Despegue
+heli->takeoff();
+usleep(3500000);
+cout<<"takeoff"<<endl;
+
+//hover
+//heli->setAngles(pitch, roll, yaw, height, hover);
+heli->setAngles(0.0, 0.0, 0.0, 0.0, 1);
+usleep(2000000);
+cout<<"hover"<<endl;
+
+//Yaw
+//heli->setAngles(pitch, roll, yaw, height, hover);
+heli->setAngles(0.0, 0.0, 20000.0, 0.0, 0.0);
+usleep(1000000);
+cout<<"yaw"<<endl;
+
+//hover
+//heli->setAngles(pitch, roll, yaw, height, hover);
+heli->setAngles(0.0, 0.0, 0.0, 0.0, 1);
+usleep(2000000);
+cout<<"hover2"<<endl;
+
+
+//Yaw
+//heli->setAngles(pitch, roll, yaw, height, hover);
+heli->setAngles(0.0, 0.0, 20000.0, 0.0, 0.0);
+usleep(1000000);
+cout<<"yaw"<<endl;
+
+//Pitch
+//heli->setAngles(pitch, roll, yaw, height, hover);
+//heli->setAngles(-10000, 0.0, 0.0, 0.0, 0.0);
+//usleep(500000);
+//cout<<"pitch"<<endl;
+
+}
+
+
 void displayConsoleData()
 {
 	// Clear the console
@@ -345,9 +387,9 @@ void pollJoystick()
 	  joypadPitch = SDL_JoystickGetAxis(m_joystick, 3);
 	  joypadVerticalSpeed = SDL_JoystickGetAxis(m_joystick, 1);
 	  joypadYaw = SDL_JoystickGetAxis(m_joystick, 0);
-	  joypadTakeOff = SDL_JoystickGetButton(m_joystick, 1);
-	  joypadLand = SDL_JoystickGetButton(m_joystick, 2);
-	  joypadHover = SDL_JoystickGetButton(m_joystick, 0);
+	  joypadTakeOff = SDL_JoystickGetButton(m_joystick, 12);
+	  joypadLand = SDL_JoystickGetButton(m_joystick, 14);
+	  joypadHover = SDL_JoystickGetButton(m_joystick, 11);
 	}
 
 	// Writing takeoff/land commands to drone
@@ -359,6 +401,10 @@ void pollJoystick()
 	  }
 	  //hover = joypadHover ? 1 : 0;
 
+} // end of pollJoystick
+
+void setDroneAngles()
+{
 	//setting the drone angles
 	if (joypadRoll != 0 || joypadPitch != 0 || joypadVerticalSpeed != 0 || joypadYaw != 0)
 		{
@@ -370,8 +416,7 @@ void pollJoystick()
 				heli->setAngles(pitch, roll, yaw, height, hover);
 				navigatedWithJoystick = false;
 		}
-
-} // end of pollJoystick
+}
 
 void pollKeyboard()	// Polls the keyboard for events, waits for KEYBOARD_DELAY milliseconds
 {
@@ -392,6 +437,7 @@ void pollKeyboard()	// Polls the keyboard for events, waits for KEYBOARD_DELAY m
 		case 'i': pitch = -20000.0; break;
 		case 'k': pitch = 20000.0; break;
 		case 'h': hover = (hover + 1) % 2; break;
+		case 'm': funcion_prueba(); break;
 		case '.': freezeImage = !freezeImage; break;
 		case 27: stop = true; break;
 		default: pitch = roll = yaw = height = 0.0;
@@ -443,6 +489,7 @@ int main(int argc,char* argv[])
 			// Read controls
 			pollJoystick();
 			pollKeyboard();
+			setDroneAngles();
 
     	displayConsoleData();	// print telemetric drone and image info through console
 
