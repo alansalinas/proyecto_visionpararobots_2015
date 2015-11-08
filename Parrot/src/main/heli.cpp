@@ -13,9 +13,14 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <iostream>
+#include <math.h>
+#include <queue>
+#include <time.h>
+#include <exception>
 
 #define KEYBOARD_DELAY 5
 #define SLEEP_DELAY	15000
+#define PI 3.14159265;
 
 //	HSV Filter Limit Range
 #define HSV_FILTER_H_MIN	0
@@ -26,23 +31,25 @@
 #define HSV_FILTER_S_MAX	255
 #define HSV_FILTER_V_MAX	235
 
-// RGB Filter Limit Range
-#define RGB_FILTER_R_MIN	215
-#define RGB_FILTER_G_MIN	85
-#define RGB_FILTER_B_MIN	32
+#define Trian1_min 0.182528
+#define Trian1_max 0.191274
+#define Trian2_min 0.0000007278
+#define Trian2_max 0.0005193
 
-#define RGB_FILTER_R_MAX	241
-#define RGB_FILTER_G_MAX	125
-#define RGB_FILTER_B_MAX	96
+#define R1_min 0.925181
+#define R1_max 1.2195
+#define R2_min 0.8285
+#define R2_max 1.45908
 
-// YCrCb Filter Limit Range
-#define YCrCb_FILTER_Y_MIN	100
-#define YCrCb_FILTER_Cr_MIN	200
-#define YCrCb_FILTER_Cb_MIN	90
+#define Tach1_min 0.745759
+#define Tach1_max 0.883261
+#define Tach2_min 0.5144
+#define Tach2_max 0.734581
 
-#define YCrCb_FILTER_Y_MAX	170
-#define YCrCb_FILTER_Cr_MAX	220
-#define YCrCb_FILTER_Cb_MAX	160
+#define C1_min 0.159193
+#define C1_max 0.159663
+#define C2_min 0.000000160229
+#define C2_max 0.000151656
 
 using namespace std;
 using namespace cv;
@@ -50,6 +57,9 @@ using namespace cv;
 /*
 	Global variable declarations
 */
+
+RNG rng(12345);
+int cont = 1;
 
 bool stop = false;
 bool freezeImage = false;
@@ -69,6 +79,13 @@ int Py;
 int vR, vG, vB;	// variables para modelo RGB
 int vV, vS, vH;	// variables para modelo HSV
 int vY, vCr, vCb;	// variables para modelo Y Cr Cb
+
+double meanH = 0;
+double meanS = 0;
+double meanV = 0;
+double varH = 0;
+double varS = 0;
+double varV = 0;
 
 // Global Mat images
 Mat imagenClick, imagenHSV, imagenGrayscale, imagenYCrCb;
@@ -302,53 +319,8 @@ void getRGBHistogram(Mat src)
 	line(histImageG, Point(vG*2, hist_h), Point(vG*2, hist_h - cvRound(g_hist.at<float>(vG))), Scalar(255, 255, 255), 2, 8, 0);
 	line(histImageB, Point(vB *2, hist_h), Point(vB*2, hist_h - cvRound(b_hist.at<float>(vB))), Scalar(255, 255, 255), 2, 8, 0);
 
-
-	/// Display
-	imshow("Hist R", histImageR);
-	imshow("Hist G", histImageG);
-	imshow("Hist B", histImageB);
 }	// end histogramas
 
-void funcion_prueba() {
-
-cout<<"funcion prueba"<<endl;
-//Despegue
-heli->takeoff();
-usleep(3500000);
-cout<<"takeoff"<<endl;
-
-//hover
-//heli->setAngles(pitch, roll, yaw, height, hover);
-heli->setAngles(0.0, 0.0, 0.0, 0.0, 1);
-usleep(2000000);
-cout<<"hover"<<endl;
-
-//Yaw
-//heli->setAngles(pitch, roll, yaw, height, hover);
-heli->setAngles(0.0, 0.0, 20000.0, 0.0, 0.0);
-usleep(1000000);
-cout<<"yaw"<<endl;
-
-//hover
-//heli->setAngles(pitch, roll, yaw, height, hover);
-heli->setAngles(0.0, 0.0, 0.0, 0.0, 1);
-usleep(2000000);
-cout<<"hover2"<<endl;
-
-
-//Yaw
-//heli->setAngles(pitch, roll, yaw, height, hover);
-heli->setAngles(0.0, 0.0, 20000.0, 0.0, 0.0);
-usleep(1000000);
-cout<<"yaw"<<endl;
-
-//Pitch
-//heli->setAngles(pitch, roll, yaw, height, hover);
-//heli->setAngles(-10000, 0.0, 0.0, 0.0, 0.0);
-//usleep(500000);
-//cout<<"pitch"<<endl;
-
-}
 
 
 void displayConsoleData()
@@ -437,15 +409,269 @@ void pollKeyboard()	// Polls the keyboard for events, waits for KEYBOARD_DELAY m
 		case 'i': pitch = -20000.0; break;
 		case 'k': pitch = 20000.0; break;
 		case 'h': hover = (hover + 1) % 2; break;
-		case 'm': funcion_prueba(); break;
+		//case 'm': funcion_prueba(); break;
 		case '.': freezeImage = !freezeImage; break;
 		case 27: stop = true; break;
 		default: pitch = roll = yaw = height = 0.0;
 		}
 }
 
+CvPoint detecta(Mat imagen)
+{
+	int x = rand() % imagen.cols;
+	int y = rand() % imagen.rows;
+	CvPoint cvp;
+	cvp.x = x;
+	cvp.y = y;
+	return cvp;
+}
+
+
+void explora(CvPoint p, Mat img, Mat regiones, int regionesActual)
+{
+	CvPoint actual = p;
+	regiones.at<uchar>(actual) = regionesActual;
+
+	int x = actual.x;
+	int y = actual.y;
+	queue<CvPoint> lista;
+	lista.push(p);
+
+	double area = 0;
+
+	//momentos estadisticos
+	double m10 = 0;
+	double m01 = 0;
+
+	double m11 = 0;
+	double m20 = 0;
+	double m02 = 0;
+
+	//momentos centralizados
+	double u20 = 0;
+	double u02 = 0;
+	double u11 = 0;
+
+	double up20 = 0;
+	double up02 = 0;
+	double up11 = 0;
+
+	double thetaInc = 0;
+	double phi1 = 0;
+	double phi2 = 0;
+
+	while (!lista.empty())
+	{
+		area++;
+		actual = lista.front();
+		lista.pop();
+		// Inicia expansion
+		x = actual.x;
+		y = actual.y;
+		//Momentos estadisticos primer orden
+		m10 += x;
+		m01 += y;
+		//momentos estadisticos segundo orden
+		m11 += x*y;
+		m20 += x*x;
+		m02 += y*y;
+		//arriba, izquierda, abajo, derecha
+		Point v[4] = { Point(x, y + 1), Point(x - 1, y), Point(x, y - 1), Point(x + 1, y) };
+
+		for (int i = 0; i < 4; i++)
+		{
+			if (v[i].x < 0)
+				v[i].x = 0;
+			if (v[i].x >= regiones.cols)
+				v[i].x = regiones.cols - 1;
+
+			if (v[i].y < 0)
+				v[i].y = 0;
+			if (v[i].y >= regiones.rows)
+				v[i].y = regiones.rows - 1;
+
+			int v1;
+
+			v1 = img.at<uchar>(v[i]);
+			if (v1 == 255 && regiones.at<uchar>(v[i]) == 0)
+			{
+				regiones.at<uchar>(v[i]) = regionesActual;
+				lista.push(v[i]);
+			}
+		}
+	}
+
+	//centroides
+	double xMedia = m10 / area;
+	double yMedia = m01 / area;
+	Point centro = Point(xMedia, yMedia);
+
+	//Momentos centralizados
+	u11 = m11 - yMedia*m10;
+	u20 = m20 - xMedia*m10;
+	u02 = m02 - yMedia*m01;
+
+	//Momentos primo centralizados
+	up11 = u11 / area;
+	up20 = u20 / area;
+	up02 = u02 / area;
+
+	//Momentos invariantes
+	double n20 = u20 / pow(area, 2);
+	double n02 = u02 / pow(area, 2);
+	double n11 = u11 / pow(area, 2);
+
+	phi1 = n20 + n02;
+	phi2 = pow((n20 - n02), 2) + (4 * pow(n11, 2));
+
+	//theta de inclinacion
+	//thetaInc = 0.5 * atan((2.0*up11) / (up20-up02));
+
+	thetaInc = 0.5 * atan2((2.0*u11), (u20 - u02));
+	double theta = thetaInc * (180 / 3.14159265);
+	//desplegar resultados
+	//cout << "m01: " << m10 << " m10: " << m01 << endl;
+	//cout << "u11: " << u11 << endl;
+	//cout << "n20: " << n20 << endl;
+	//cout << "n02: " << n02 << endl;
+
+	if (area > 1000)
+	{
+		cout << "Area Region " << regionesActual << ": " << area << endl;
+		cout << "phi1: " << phi1 << endl;
+		cout << "phi2: " << phi2 << endl;
+		cout << "theta: " << theta << endl;
+
+
+		double minMarg = 0.90;
+		double maxMarg = 1.10;
+		if (phi1 > Trian1_min*minMarg && phi1 < Trian1_max*maxMarg && phi2 > Trian2_min*minMarg && phi2 < Trian2_max*maxMarg)
+			cout << "traingulo" << endl;
+		if (phi1 > C1_min*minMarg && phi1 < C1_max*maxMarg && phi2 > C2_min*minMarg && phi2 < C2_max*maxMarg)
+			cout << "circulo" << endl;
+		if (phi1 > R1_min*minMarg && phi1 < R1_max*maxMarg && phi2 > R2_min*minMarg && phi2 < R2_max*maxMarg)
+		{
+			cout << "rectangulo";
+			if (theta > 10)
+			{
+				cout << " baja" << endl;
+			}
+			else if (theta < -10)
+			{
+				cout << " sube" << endl;
+			}
+			else
+			{
+				cout << " mismo nivel" << endl;
+			}
+		}
+		if (phi1 > Tach1_min*minMarg && phi1 < Tach1_max*maxMarg && phi2 > Tach2_min*minMarg && phi2 < Tach2_max*maxMarg)
+		{
+			cout << "tacha";
+			if (theta > 10)
+			{
+				cout << " baja" << endl;
+			}
+			else if (theta < -10)
+			{
+				cout << " sube" << endl;
+			}
+			else
+			{
+				cout << " mismo nivel" << endl;
+			}
+		}
+		cout << "__________________________________________________" << endl;
+
+
+		int val = sqrt(u20)/100;
+		int val2 = sqrt(u02)/100;
+		//circle(regiones, cvPoint(xMedia, yMedia),1, 0, 2, 8, 0);
+		//line(regiones, (centro-Point(val*cos(thetaInc), val*sin(thetaInc))),
+		//              (centro+Point(val*cos(thetaInc), val*sin(thetaInc))), 127, 1);
+
+		line(regiones, (centro - Point(val*cos(thetaInc), val*sin(thetaInc))),
+			(centro + Point(val*cos(thetaInc), val*sin(thetaInc))), 127, 1);
+
+		line(regiones, (centro - Point(val2*cos(1.570796327 + thetaInc), val2*sin(1.570796327 + thetaInc))),
+			(centro + Point(val2*cos(1.570796327 + thetaInc), val2*sin(1.570796327 + thetaInc))), 127, 1);
+
+		//line(regiones, (Point(xMedia,yMedia)+Point(val*cos(theta2), val*sin(theta2))),
+		//                (Point(xMedia, yMedia)-Point(val*cos(theta2), val*sin(theta2))), 160, 1);
+
+	}
+
+	//cout << "theta " << cont << ": " << thetaInc << endl;
+	cont++;
+
+
+}
+
+Mat segmenta(Mat imgOriginal)
+{
+
+
+	Mat regiones = Mat::zeros(imgOriginal.rows, imgOriginal.cols, CV_8UC1);
+
+
+	if (imgOriginal.channels() != 1)
+	{
+		cout << "Error: La imagen no est� en blanco y negro" << endl;
+		return regiones;
+	}
+
+	int regionesActual = 255;
+	int pixelesImagen = imgOriginal.rows*imgOriginal.cols;
+
+	for (int i = 0; i < pixelesImagen*0.5; i++)
+	{
+
+		if (regionesActual < 0)
+			break;
+
+		CvPoint p = detecta(imgOriginal);
+
+		int valor = 255;
+
+		valor = imgOriginal.at<uchar>(p);
+
+		if (valor == 255 && regiones.at<uchar>(p) == 0)
+		{
+
+			explora(p, imgOriginal, regiones, regionesActual);
+			regionesActual -= 7;
+		}
+	}
+
+	return regiones;
+}
+
+void filtroRuido()
+{
+	blur(imagenFiltroHSV, imagenFiltroHSV, Size(5, 5), Point(-1, -1), 4);
+
+	// Erosion y luego dilatacion
+	Mat element;
+	int size = 3;
+	int type = MORPH_CROSS;
+
+	element = getStructuringElement(type,Size(2 * size + 1, 2 * size + 1),	Point(size, size));
+	morphologyEx(imagenFiltroHSV, imagenFiltroHSV, MORPH_OPEN ,element);
+	morphologyEx(imagenFiltroHSV, imagenFiltroHSV, MORPH_CLOSE, element);
+
+	cvtColor(imagenFiltroHSV, imagenGrayscale, CV_HSV2BGR);
+	cvtColor(imagenGrayscale, imagenGrayscale, CV_BGR2GRAY);
+
+	//	cvtColor(currentImage, imagenGrayscale, CV_BGR2GRAY);
+	threshold(imagenGrayscale, imagenThreshold, 10, 255, THRESH_BINARY);
+
+	bitwise_not(segmenta(imagenThreshold), imagenThreshold);
+}
+
 void setup()
 {
+	srand(time(0));
+
 	//establishing connection with the quadcopter
 	heli = new CHeli();
 
@@ -467,9 +693,6 @@ void setup()
 	*/
 
 	namedWindow("Click");
-	namedWindow("Hist R", CV_WINDOW_AUTOSIZE);
-	namedWindow("Hist G", CV_WINDOW_AUTOSIZE);
-	namedWindow("Hist B", CV_WINDOW_AUTOSIZE);
 
 	droneImage = new CRawImage(320,240); //this class holds the image from the drone
 	setMouseCallback("Click", mouseCoordinatesExampleCallback);
@@ -504,7 +727,7 @@ int main(int argc,char* argv[])
 			//imagenClick =  imread("/home/alan/Pictures/tv.jpg", 1);
 
 			imagenClick = currentImage;
-			getRGBHistogram(currentImage);
+			//getRGBHistogram(currentImage);
 
 			imagenFiltroRGB = Mat::zeros(240, 320, CV_8UC3);
 			imagenFiltroHSV = Mat::zeros(240, 320, CV_8UC3);
@@ -515,18 +738,10 @@ int main(int argc,char* argv[])
 			cvtColor(currentImage, imagenYCrCb, CV_BGR2YCrCb);
 			threshold(imagenGrayscale, imagenThreshold, 150, 255, THRESH_BINARY);
 
-			// filtro de color RGB Scalar(B,G,R)
-			inRange(imagenClick, Scalar(RGB_FILTER_B_MIN, RGB_FILTER_G_MIN, RGB_FILTER_R_MIN), Scalar(RGB_FILTER_B_MAX, RGB_FILTER_G_MAX, RGB_FILTER_R_MAX), maskFiltroRGB);
-			bitwise_and(imagenClick, imagenClick, imagenFiltroRGB, maskFiltroRGB);
-
 			// filtro de color HSV Scalar(H,S,V)
 			inRange(imagenClick, Scalar(HSV_FILTER_H_MIN, HSV_FILTER_S_MIN, HSV_FILTER_V_MIN), Scalar(HSV_FILTER_H_MAX, HSV_FILTER_S_MAX, HSV_FILTER_V_MAX), maskFiltroHSV);
 			bitwise_and(imagenClick, imagenClick, imagenFiltroHSV, maskFiltroHSV);
 
-
-			// filtro de colOR YCrCb
-			inRange(imagenClick, Scalar(YCrCb_FILTER_Y_MIN, YCrCb_FILTER_Cr_MIN, YCrCb_FILTER_Cb_MIN), Scalar(YCrCb_FILTER_Y_MAX, YCrCb_FILTER_Cr_MAX, YCrCb_FILTER_Cb_MAX), maskFiltroHSV);
-			bitwise_and(imagenClick, imagenClick, imagenFiltroYCrCb, maskFiltroYCrCb);
 
 			// Show images
 			//imshow("Original", currentImage);
@@ -535,7 +750,6 @@ int main(int argc,char* argv[])
 			imshow("Grayscale", imagenGrayscale);
 			imshow("Threshold", imagenThreshold);
 			imshow("HSE", imagenHSV);
-			imshow("Filtro RGB", imagenFiltroRGB);
 			imshow("Filtro HSV", imagenFiltroHSV);
 
       usleep(SLEEP_DELAY);
