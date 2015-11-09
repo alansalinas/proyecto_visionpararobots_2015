@@ -17,34 +17,35 @@
 #include <queue>
 #include <time.h>
 #include <exception>
+#include <vector>
 
 #define KEYBOARD_DELAY 5
 #define SLEEP_DELAY	15000
 #define PI 3.14159265;
 
 //	HSV Filter Limit Range
-#define HSV_FILTER_H_MIN	0
-#define HSV_FILTER_S_MIN	0
-#define HSV_FILTER_V_MIN	105
+#define HSV_FILTER_H_MIN	80
+#define HSV_FILTER_S_MIN	60
+#define HSV_FILTER_V_MIN	20
 
-#define HSV_FILTER_H_MAX	50
-#define HSV_FILTER_S_MAX	255
-#define HSV_FILTER_V_MAX	235
+#define HSV_FILTER_H_MAX	110
+#define HSV_FILTER_S_MAX	200
+#define HSV_FILTER_V_MAX	180
 
 #define Trian1_min 0.182528
 #define Trian1_max 0.191274
 #define Trian2_min 0.0000007278
 #define Trian2_max 0.0005193
 
-#define R1_min 0.925181
+#define R1_min 0.825181
 #define R1_max 1.2195
-#define R2_min 0.8285
+#define R2_min 0.6285
 #define R2_max 1.45908
 
-#define Tach1_min 0.745759
-#define Tach1_max 0.883261
-#define Tach2_min 0.5144
-#define Tach2_max 0.734581
+#define Tach1_min 0.231594
+#define Tach1_max 0.246809
+#define Tach2_min 0.0258334
+#define Tach2_max 0.0331681
 
 #define C1_min 0.159193
 #define C1_max 0.159663
@@ -54,9 +55,23 @@
 using namespace std;
 using namespace cv;
 
+typedef struct regiones_struct
+{
+	int id;
+	int tipo;
+	string accion;
+	double area;
+	double phi1;
+	double phi2;
+	double theta;
+} regionStruct;
+
 /*
 	Global variable declarations
 */
+stringstream texto;
+
+vector<regionStruct> vectorRegiones;
 
 RNG rng(12345);
 int cont = 1;
@@ -104,6 +119,8 @@ int hist_w = 516; int hist_h = 516;
  * This method flips horizontally the sourceImage into destinationImage. Because it uses
  * "Mat::at" method, its performance is low (redundant memory access searching for pixels).
  */
+void filtroRuido();
+
 void flipImageBasic(const Mat &sourceImage, Mat &destinationImage)
 {
 	if (destinationImage.empty())
@@ -344,6 +361,17 @@ void displayConsoleData()
 	cout<<"Pos X: "<<Px<<" Pos Y: "<<Py<<" Valor RGB: ("<<vR<<","<<vG<<","<<vB<<")"<<endl;
 	cout<<"Pos X: "<<Px<<" Pos Y: "<<Py<<" Valor HSV: ("<<vH<<","<<vS<<","<<vV<<")"<<endl;
 	cout<<"Pos X: "<<Px<<" Pos Y: "<<Py<<" Valor Y Cr Cb: ("<<vY<<","<<vCr<<","<<vCb<<")"<<endl;
+	cout << endl << "Numero de regiones:" << vectorRegiones.size() << endl;
+
+	for (int k = 0; k < vectorRegiones.size(); k++)
+	{
+		cout << "tipo: " << vectorRegiones[k].tipo << endl;
+		cout << "phi1: " << vectorRegiones[k].phi1 << endl;
+		cout << "phi2: " << vectorRegiones[k].phi2 << endl;
+		cout << "area: " << vectorRegiones[k].area << endl;
+		cout << "accion: " << vectorRegiones[k].accion << endl << endl;
+	}
+
 }
 
 // Polls the joystick controller for changes and commands them to drone
@@ -355,13 +383,13 @@ void pollJoystick()
 		SDL_Event event;
 	  SDL_PollEvent(&event);
 
-	  joypadRoll = SDL_JoystickGetAxis(m_joystick, 2);
-	  joypadPitch = SDL_JoystickGetAxis(m_joystick, 3);
+	  joypadRoll = SDL_JoystickGetAxis(m_joystick, 3);
+	  joypadPitch = SDL_JoystickGetAxis(m_joystick, 4);
 	  joypadVerticalSpeed = SDL_JoystickGetAxis(m_joystick, 1);
 	  joypadYaw = SDL_JoystickGetAxis(m_joystick, 0);
-	  joypadTakeOff = SDL_JoystickGetButton(m_joystick, 12);
-	  joypadLand = SDL_JoystickGetButton(m_joystick, 14);
-	  joypadHover = SDL_JoystickGetButton(m_joystick, 11);
+	  joypadTakeOff = SDL_JoystickGetButton(m_joystick, 0);
+	  joypadLand = SDL_JoystickGetButton(m_joystick, 2);
+	  joypadHover = SDL_JoystickGetButton(m_joystick, 3);
 	}
 
 	// Writing takeoff/land commands to drone
@@ -409,11 +437,27 @@ void pollKeyboard()	// Polls the keyboard for events, waits for KEYBOARD_DELAY m
 		case 'i': pitch = -20000.0; break;
 		case 'k': pitch = 20000.0; break;
 		case 'h': hover = (hover + 1) % 2; break;
-		//case 'm': funcion_prueba(); break;
+		case 'm': filtroRuido(); break;
 		case '.': freezeImage = !freezeImage; break;
 		case 27: stop = true; break;
 		default: pitch = roll = yaw = height = 0.0;
 		}
+}
+
+void adelante()
+{
+	//heli->setAngles(pitch, roll, yaw, height, hover);
+	heli->setAngles(-20000.0, 0.0, 0.0, 0.0, 0.0);
+	usleep(1000000);
+	cout<<"pitch"<<endl;
+}
+
+void atras()
+{
+	//heli->setAngles(pitch, roll, yaw, height, hover);
+	heli->setAngles(20000.0, 0.0, 0.0, 0.0, 0.0);
+	usleep(1000000);
+	cout<<"pitch"<<endl;
 }
 
 CvPoint detecta(Mat imagen)
@@ -431,6 +475,8 @@ void explora(CvPoint p, Mat img, Mat regiones, int regionesActual)
 {
 	CvPoint actual = p;
 	regiones.at<uchar>(actual) = regionesActual;
+
+	texto.str("hola");
 
 	int x = actual.x;
 	int y = actual.y;
@@ -537,51 +583,69 @@ void explora(CvPoint p, Mat img, Mat regiones, int regionesActual)
 
 	if (area > 1000)
 	{
+		regionStruct reg;
+
 		cout << "Area Region " << regionesActual << ": " << area << endl;
 		cout << "phi1: " << phi1 << endl;
 		cout << "phi2: " << phi2 << endl;
 		cout << "theta: " << theta << endl;
 
-
 		double minMarg = 0.90;
 		double maxMarg = 1.10;
 		if (phi1 > Trian1_min*minMarg && phi1 < Trian1_max*maxMarg && phi2 > Trian2_min*minMarg && phi2 < Trian2_max*maxMarg)
-			cout << "traingulo" << endl;
+			reg.tipo = 0;//cout << "traingulo" << endl;
 		if (phi1 > C1_min*minMarg && phi1 < C1_max*maxMarg && phi2 > C2_min*minMarg && phi2 < C2_max*maxMarg)
-			cout << "circulo" << endl;
+			reg.tipo = 1;//cout << "circulo" << endl;
 		if (phi1 > R1_min*minMarg && phi1 < R1_max*maxMarg && phi2 > R2_min*minMarg && phi2 < R2_max*maxMarg)
 		{
 			cout << "rectangulo";
+			reg.tipo = 2;
 			if (theta > 10)
 			{
 				cout << " baja" << endl;
+				reg.accion = "baja";
 			}
 			else if (theta < -10)
 			{
 				cout << " sube" << endl;
+				reg.accion = "sube";
 			}
 			else
 			{
 				cout << " mismo nivel" << endl;
+				reg.accion = "mismo nivel";
 			}
 		}
 		if (phi1 > Tach1_min*minMarg && phi1 < Tach1_max*maxMarg && phi2 > Tach2_min*minMarg && phi2 < Tach2_max*maxMarg)
 		{
 			cout << "tacha";
+			reg.tipo = 3;
 			if (theta > 10)
 			{
 				cout << " baja" << endl;
+				reg.accion = "baja";
 			}
 			else if (theta < -10)
 			{
 				cout << " sube" << endl;
+				reg.accion = "sube";
 			}
 			else
 			{
 				cout << " mismo nivel" << endl;
+				reg.accion = "sube";
 			}
 		}
 		cout << "__________________________________________________" << endl;
+
+		// generate structure and add to vector
+		reg.id = regionesActual;
+		reg.area = area;
+		reg.phi1 = phi1;
+		reg.phi2 = phi2;
+		reg.theta = theta;
+
+		vectorRegiones.push_back(reg);
 
 
 		int val = sqrt(u20)/100;
@@ -620,13 +684,13 @@ Mat segmenta(Mat imgOriginal)
 		return regiones;
 	}
 
-	int regionesActual = 255;
+	int regionesActual = 1;
 	int pixelesImagen = imgOriginal.rows*imgOriginal.cols;
 
 	for (int i = 0; i < pixelesImagen*0.5; i++)
 	{
 
-		if (regionesActual < 0)
+		if (regionesActual > 255)
 			break;
 
 		CvPoint p = detecta(imgOriginal);
@@ -639,7 +703,7 @@ Mat segmenta(Mat imgOriginal)
 		{
 
 			explora(p, imgOriginal, regiones, regionesActual);
-			regionesActual -= 7;
+			regionesActual += 1;
 		}
 	}
 
@@ -650,6 +714,7 @@ void filtroRuido()
 {
 	blur(imagenFiltroHSV, imagenFiltroHSV, Size(5, 5), Point(-1, -1), 4);
 
+	vectorRegiones.clear();
 	// Erosion y luego dilatacion
 	Mat element;
 	int size = 3;
@@ -664,8 +729,24 @@ void filtroRuido()
 
 	//	cvtColor(currentImage, imagenGrayscale, CV_BGR2GRAY);
 	threshold(imagenGrayscale, imagenThreshold, 10, 255, THRESH_BINARY);
-
+	imshow("entrada", imagenThreshold);
 	bitwise_not(segmenta(imagenThreshold), imagenThreshold);
+	imshow("salida", imagenThreshold);
+
+	for (int k = 0; k < vectorRegiones.size(); k++)
+	{
+			if(vectorRegiones[k].tipo > 3)
+				break;
+
+			switch (vectorRegiones[k].tipo)
+			{
+			case 0: adelante(); break;
+			case 1: atras(); break;
+			default: break;
+			}
+
+	}
+
 }
 
 void setup()
@@ -735,21 +816,16 @@ int main(int argc,char* argv[])
 			// Conversiones de espacios de color
 			cvtColor(currentImage, imagenGrayscale, CV_BGR2GRAY);
 			cvtColor(currentImage, imagenHSV, CV_BGR2HSV);
-			cvtColor(currentImage, imagenYCrCb, CV_BGR2YCrCb);
-			threshold(imagenGrayscale, imagenThreshold, 150, 255, THRESH_BINARY);
+			//threshold(imagenGrayscale, imagenThreshold, 150, 255, THRESH_BINARY);
 
 			// filtro de color HSV Scalar(H,S,V)
-			inRange(imagenClick, Scalar(HSV_FILTER_H_MIN, HSV_FILTER_S_MIN, HSV_FILTER_V_MIN), Scalar(HSV_FILTER_H_MAX, HSV_FILTER_S_MAX, HSV_FILTER_V_MAX), maskFiltroHSV);
-			bitwise_and(imagenClick, imagenClick, imagenFiltroHSV, maskFiltroHSV);
-
+			inRange(imagenHSV, Scalar(HSV_FILTER_H_MIN, HSV_FILTER_S_MIN, HSV_FILTER_V_MIN), Scalar(HSV_FILTER_H_MAX, HSV_FILTER_S_MAX, HSV_FILTER_V_MAX), maskFiltroHSV);
+			bitwise_and(imagenHSV, imagenHSV, imagenFiltroHSV, maskFiltroHSV);
 
 			// Show images
 			//imshow("Original", currentImage);
 			//imshow("ParrotCam", currentImage);
     	imshow("Click", imagenClick);
-			imshow("Grayscale", imagenGrayscale);
-			imshow("Threshold", imagenThreshold);
-			imshow("HSE", imagenHSV);
 			imshow("Filtro HSV", imagenFiltroHSV);
 
       usleep(SLEEP_DELAY);
@@ -759,5 +835,6 @@ int main(int argc,char* argv[])
     SDL_JoystickClose(m_joystick);
     delete heli;
 	delete droneImage;
+	vectorRegiones.clear();
 	return 0;
 }
