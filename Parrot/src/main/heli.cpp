@@ -23,28 +23,20 @@
 #define SLEEP_DELAY	15000
 #define PI 3.14159265;
 
-//	HSV Filter Limit Range
-#define HSV_FILTER_H_MIN	80
-#define HSV_FILTER_S_MIN	60
-#define HSV_FILTER_V_MIN	20
-
-#define HSV_FILTER_H_MAX	110
-#define HSV_FILTER_S_MAX	200
-#define HSV_FILTER_V_MAX	180
 
 #define Trian1_min 0.182528
 #define Trian1_max 0.191274
 #define Trian2_min 0.0000007278
 #define Trian2_max 0.0005193
 
-#define R1_min 0.825181
+#define R1_min 0.40
 #define R1_max 1.2195
-#define R2_min 0.6285
+#define R2_min 0.13
 #define R2_max 1.45908
 
-#define Tach1_min 0.231594
+#define Tach1_min 0.20
 #define Tach1_max 0.246809
-#define Tach2_min 0.0258334
+#define Tach2_min 0.014
 #define Tach2_max 0.0331681
 
 #define C1_min 0.159193
@@ -54,6 +46,8 @@
 
 using namespace std;
 using namespace cv;
+
+const string trackbarWindowName = "Trackbars";
 
 typedef struct regiones_struct
 {
@@ -70,6 +64,13 @@ typedef struct regiones_struct
 	Global variable declarations
 */
 stringstream texto;
+
+int H_MIN = 34;
+int H_MAX = 138;
+int S_MIN = 79;
+int S_MAX = 206;
+int V_MIN = 0;
+int V_MAX = 149;
 
 vector<regionStruct> vectorRegiones;
 
@@ -369,6 +370,7 @@ void displayConsoleData()
 		cout << "phi1: " << vectorRegiones[k].phi1 << endl;
 		cout << "phi2: " << vectorRegiones[k].phi2 << endl;
 		cout << "area: " << vectorRegiones[k].area << endl;
+		cout << "theta: " << vectorRegiones[k].theta << endl;
 		cout << "accion: " << vectorRegiones[k].accion << endl << endl;
 	}
 
@@ -380,6 +382,7 @@ void pollJoystick()
 	// Reading of events
 	if (useJoystick)
 	{
+		hover = 0;
 		SDL_Event event;
 	  SDL_PollEvent(&event);
 
@@ -447,7 +450,7 @@ void pollKeyboard()	// Polls the keyboard for events, waits for KEYBOARD_DELAY m
 void adelante()
 {
 	//heli->setAngles(pitch, roll, yaw, height, hover);
-	heli->setAngles(-20000.0, 0.0, 0.0, 0.0, 0.0);
+	heli->setAngles(-10000.0, 0.0, 0.0, 0.0, 0.0);
 	usleep(1000000);
 	cout<<"pitch"<<endl;
 }
@@ -455,9 +458,79 @@ void adelante()
 void atras()
 {
 	//heli->setAngles(pitch, roll, yaw, height, hover);
-	heli->setAngles(20000.0, 0.0, 0.0, 0.0, 0.0);
+	heli->setAngles(10000.0, 0.0, 0.0, 0.0, 0.0);
 	usleep(1000000);
 	cout<<"pitch"<<endl;
+}
+
+void izquierda()
+{
+	//heli->setAngles(pitch, roll, yaw, height, hover);
+	heli->setAngles(0.0, -10000.0, 0.0, 0.0, 0.0);
+	usleep(1000000);
+	cout<<"pitch"<<endl;
+}
+
+void derecha()
+{
+	//heli->setAngles(pitch, roll, yaw, height, hover);
+	heli->setAngles(0.0, 10000.0, 0.0, 0.0, 0.0);
+	usleep(1000000);
+}
+
+void arriba()
+{
+	//heli->setAngles(pitch, roll, yaw, height, hover);
+	heli->setAngles(0.0, 0.0, 0.0, -15000.0, 0.0);
+	usleep(1000000);
+}
+
+void abajo()
+{
+	//heli->setAngles(pitch, roll, yaw, height, hover);
+	heli->setAngles(0.0, 0.0, 0.0, 15000.0, 0.0);
+	usleep(1000000);
+}
+
+void on_trackbar( int, void* )
+{//This function gets called whenever a
+    // trackbar position is changed
+
+}
+
+string intToString(int number){
+
+
+    std::stringstream ss;
+    ss << number;
+    return ss.str();
+}
+
+
+void createTrackbars(){
+    //create window for trackbars
+    namedWindow(trackbarWindowName,0);
+
+
+    //create memory to store trackbar name on window
+    char TrackbarName[50];
+    printf( TrackbarName, "H_MIN", H_MIN);
+    printf( TrackbarName, "H_MAX", H_MAX);
+    printf( TrackbarName, "S_MIN", S_MIN);
+    printf( TrackbarName, "S_MAX", S_MAX);
+    printf( TrackbarName, "V_MIN", V_MIN);
+    printf( TrackbarName, "V_MAX", V_MAX);
+
+
+    //create trackbars and insert them into window
+    createTrackbar( "H_MIN", trackbarWindowName, &H_MIN, H_MAX, on_trackbar );
+    createTrackbar( "H_MAX", trackbarWindowName, &H_MAX, H_MAX, on_trackbar );
+    createTrackbar( "S_MIN", trackbarWindowName, &S_MIN, S_MAX, on_trackbar );
+    createTrackbar( "S_MAX", trackbarWindowName, &S_MAX, S_MAX, on_trackbar );
+    createTrackbar( "V_MIN", trackbarWindowName, &V_MIN, V_MAX, on_trackbar );
+    createTrackbar( "V_MAX", trackbarWindowName, &V_MAX, V_MAX, on_trackbar );
+
+
 }
 
 CvPoint detecta(Mat imagen)
@@ -581,7 +654,7 @@ void explora(CvPoint p, Mat img, Mat regiones, int regionesActual)
 	//cout << "n20: " << n20 << endl;
 	//cout << "n02: " << n02 << endl;
 
-	if (area > 1000)
+	if (area > 250)
 	{
 		regionStruct reg;
 
@@ -718,7 +791,7 @@ void filtroRuido()
 	// Erosion y luego dilatacion
 	Mat element;
 	int size = 3;
-	int type = MORPH_CROSS;
+	int type = MORPH_RECT;
 
 	element = getStructuringElement(type,Size(2 * size + 1, 2 * size + 1),	Point(size, size));
 	morphologyEx(imagenFiltroHSV, imagenFiltroHSV, MORPH_OPEN ,element);
@@ -742,6 +815,22 @@ void filtroRuido()
 			{
 			case 0: adelante(); break;
 			case 1: atras(); break;
+			case 2:
+				if (vectorRegiones[k].theta > 20)
+				abajo();
+				else if(vectorRegiones[k].theta < -20)
+				arriba();
+
+				izquierda();
+				break;
+			case 3:
+				if (vectorRegiones[k].theta > 20)
+				abajo();
+				else if(vectorRegiones[k].theta < -20)
+				arriba();
+
+				derecha();
+			break;
 			default: break;
 			}
 
@@ -774,9 +863,11 @@ void setup()
 	*/
 
 	namedWindow("Click");
+	//create slider bars for HSV filtering
+	createTrackbars();
 
 	droneImage = new CRawImage(320,240); //this class holds the image from the drone
-	setMouseCallback("Click", mouseCoordinatesExampleCallback);
+	//setMouseCallback("Click", mouseCoordinatesExampleCallback);
 }
 
 int main(int argc,char* argv[])
@@ -819,7 +910,7 @@ int main(int argc,char* argv[])
 			//threshold(imagenGrayscale, imagenThreshold, 150, 255, THRESH_BINARY);
 
 			// filtro de color HSV Scalar(H,S,V)
-			inRange(imagenHSV, Scalar(HSV_FILTER_H_MIN, HSV_FILTER_S_MIN, HSV_FILTER_V_MIN), Scalar(HSV_FILTER_H_MAX, HSV_FILTER_S_MAX, HSV_FILTER_V_MAX), maskFiltroHSV);
+			inRange(imagenHSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), maskFiltroHSV);
 			bitwise_and(imagenHSV, imagenHSV, imagenFiltroHSV, maskFiltroHSV);
 
 			// Show images
